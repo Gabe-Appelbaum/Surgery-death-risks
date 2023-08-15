@@ -1,0 +1,110 @@
+---
+title: "Post surgical deaths by ten year age groups"
+author: "Gabriel Appelbaum"
+output: 
+  html_document:
+    code_folding: hide
+date: "2023-05-19"
+editor_options: 
+  
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+  In today's modern world health care procedures have advanced drastically. Many surgeries are offered and performed that once could have never been thought possible. However with a rise in surgeries comes a rise in risks. The risks of dying on an operating table vary greatly but one factor of surgical risk that is often overlooked is post surgical mortality. Surviving the operation itself does not guarantee a successful operation. Even though these risks lessen once the surgery is complete some still do persist yet are often overlooked. In order to better understand what causes the most risks for these post surgical deaths I chose to focus on deaths by age group.
+  
+  For the analysis my group and I made use of the "CDC Wonder Multiple Cause of Death" data set. The analysis is limited to post surgical deaths in the United States from the year 1999 through the year 2020 which is the population of interest. The sampling frame is age groups, states, deaths, and causes of death in the United States in these years. Each case is the total deaths and total population for a certain ten year age group, in a certain state, in a certain year, for a specific cause of post surgical death. The data contains only cases with more than 10 deaths and a population of more than 20. Certain cases also come with a crude rate pre calculated. A crude rate is the deaths per 100 thousand people in the population.
+  
+  We start by loading in the appropriate packages and reading in the data. It is also important to remove the word "years" from the ten year age groups category. This makes the text much cleaner when graphing. Next we manually calculate crude rate as it isn't provided for cases with a low population.
+  
+```{r}
+library(tidyverse)
+data <- read_csv("PostSurgicalDeath.csv")
+
+data$`Ten-Year Age Groups` <- gsub(' years', '', data$`Ten-Year Age Groups`)
+data$`Ten-Year Age Groups` <- gsub(' year', '', data$`Ten-Year Age Groups`)
+data <- data %>% mutate(new_crude = (Deaths / Population) * 100000)
+data$new_crude <- round(data$new_crude, 1)
+```
+
+  Next I grouped by age groups in each year. This gives us the total deaths and total population of each age group in each year. I also calculated the new crude rate for these groups and rounded the crude rate to one decimal place.
+  
+```{r}
+gr_data <- data %>%
+   group_by(`Ten-Year Age Groups`, Year) %>%
+   summarise(Deaths = sum(Deaths), Pop = sum(Population)) %>% 
+   mutate(Crude = (Deaths / Pop) * 100000)
+
+gr_data$Crude <- round(gr_data$Crude, 1)
+```
+
+  I also grouped by just age groups. This allowed me to see total deaths, and total population for each age group across the entire data set. I also calculated the crude rate rate here in order to see the total crude rate for each age group across the entire history of our data set. Once again I rounded crude rate to one decimal place.
+  
+```{r}
+gr_2 <- gr_data %>%
+   group_by(`Ten-Year Age Groups`) %>%
+   summarise(Deaths = sum(Deaths), Pop = sum(Pop)) %>% 
+   mutate(Crude = (Deaths / Pop) * 100000)
+gr_2$Crude <- round(gr_2$Crude, 1)
+```
+
+  I expected to see that the older the group the more deaths and that was mostly true but not entirely. In order to visualize this I created a bar graph that shows the total deaths for each age group across our entire data set. The two groups with the most deaths, 65-74, and 75-84, are highlighted in cyan. The third and fourth largest groups, 55-64 and 85+, are highlighted in orange. They are highlighted because these are the groups I will be discussing specifically.
+
+  To address the hypothesis that each older group will have more deaths than the last this is mostly true. Each increasing age group has more deaths up until 65-74 and 75-84 which have significantly the most deaths. However their is a steep drop off in total deaths in the oldest group. The drop off in the 85+ group is likely due to the low population of people over the age of 85 in this data. Despite this age group having the third most deaths their population is comparable to the 35-44 age group and significantly less than the two age groups with the highest deaths, 65-74 and 75-84, by almost a full order of magnitude.
+
+  The other interesting note is the steep jump from the 45-54 group up to the 55-64 group. 45-54 has about 12 thousand deaths whereas 55-64 has about 40 thousand deaths. One potential answer here is population size. The older group has a population of almost twice the younger group. But I believe that this is also a sign of more health issues and more surgeries happening within this age group. I will revisit this issue when I discuss each age groups crude rate later in the paper.
+  
+```{r}
+ggplot(gr_data, aes(`Ten-Year Age Groups`, Deaths, fill = `Ten-Year Age Groups`)) +
+  geom_col() + 
+  scale_fill_manual(values = c("grey", "grey", "grey", "grey", "grey", "coral4", "cyan4", "cyan4", "coral2")) +
+  labs(title = "Deaths post surgery by age group", x = "Age groups", y = "Total deaths") + 
+  theme_bw()
+```
+
+  One interesting side note is that while the previous graph suggests that 75-84 is much more dangerous than 65-74 this is not always the case. When faceted by year you can see that the total deaths for each group in each year start out leaning towards the older group and then in the more recent years trend towards the younger group having more deaths. This can be seen in the following plot.
+  
+```{r}
+filter_gr_data <- gr_data %>%
+  filter(`Ten-Year Age Groups` %in% c("65-74", "75-84"))
+  
+ggplot(filter_gr_data, aes(`Ten-Year Age Groups`, Deaths, fill = `Ten-Year Age Groups`)) +
+  geom_col() + 
+  labs(title = "Deaths post surgery by age group", x = "Age groups", y = "Total deaths") + 
+  theme_bw() + 
+  facet_wrap(~Year) + 
+  theme(axis.text.x=element_blank(), #remove x axis labels
+        axis.ticks.x=element_blank(), #remove x axis ticks
+        )
+```
+
+  I decided that next I should consider deaths in age groups by rate instead of total deaths. I used the total deaths in each age group divided by the total population of each age group and then multiplied by 100 thousand in order to find crude rate, or the deaths per 100 thousand. This graph shows the crude rate of each age group on the y-axis, the age group itself on the X-axis and it is colored by crude rate. The darker a column the greater the crude rate. This plot shows a more expected progression where for the most part each older age group has a higher death rate. 
+
+  The only exception to this is the < 1 age group which has the third highest crude rate in the whole data set. This is likely for two reasons. If you are in this age group and require surgery it is likely a very dire situation that carries a higher risk meaning that each individual surgery performed in this age group is more likely to result in a death. The other reason for the high crude rate is that this age group has the smallest population, it is about 100 times smaller than the second smallest, so any deaths within it will stand out more. The risky surgeries and the small population combine to make the high crude rate seen here.
+
+  The next interesting note in this chart is that the 85+ age group is by far at the most risk. Once population is taken into account it is clear to see that this age group is at the greatest risk for post surgical death. The crude rate in this group is 10.8 and the next closest group is 75-84 with 6.2. This is likely due to the risky nature of performing surgeries on older patients.
+
+  As mentioned before I had said I would revisit the 55-64 group where there was a large jump in total deaths. In the four consecutive age groups 45-54, 55-64, 65-74, and 75-84 we see the crude rate double each time. Respectively the crude rates are 0.7, 1.4, 2.9, and 6.2. While it is possible that the steep jumps in the previous graph may have been caused by population increase rather than an actual increase in risk this crude rate data shows us two things. It shows that risk increases exponentially in these older age groups, but it also suggests that the older groups may have more health risks that require more surgeries in the first place.
+  
+```{r}
+ggplot(gr_2, aes(`Ten-Year Age Groups`, Crude, fill = factor(Crude))) +
+  geom_col(show.legend = FALSE) +
+  scale_fill_brewer(palette = "YlOrRd") +
+  labs(title = "Crude Rate Deaths post surgery", x = "Age groups", y = "Deaths per 100K") + 
+  theme_bw()
+```
+
+  Finally I include an interactive chart showing the raw numbers. This chart shows the total amount of people that there were in each age group across the entire data set. It also shows the total of deaths in each age group and it shows the crude rate, rounded to one decimal, for each group. The chart comes initially sorted by age group in descending order but can be sorted however the reader chooses.
+  
+```{r}
+
+arranged <- gr_2 %>%
+  arrange(factor(`Ten-Year Age Groups`), levels = c("< 1", "15-24", "25-34", "35-44", "45-54", "55-64", "65-74", "75-84", "85+"))
+
+DT::datatable(arranged)
+```
+
+
+In conclusion the results provide some assessments that are not incredibly insightful but also provide some stark warnings. It is not shocking that the older you are the more likely you are to experience complications related to surgery and even possibly pass away from these complications. However the levels of risks from post surgical complications is not always clear. The total deaths and the crude rates especially in the higher risk age groups give a clear warning that seems to sometimes be ignored as these relatively high numbers suggest that it is possible that many unnecessary surgeries are being performed that are risky. Further analysis, especially on the amount of surgeries being performed, is required to fully assess this possibility but one thing is for sure. The risks of surgeries, especially at older ages, stretch far beyond the operating room.
